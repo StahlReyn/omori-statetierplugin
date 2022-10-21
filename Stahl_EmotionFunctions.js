@@ -1,6 +1,6 @@
 //=============================================================================
 // Stahl Plugin - Emotion Functions
-// Stahl_EmotionFunctions.js    VERSION Beta 1.1.0
+// Stahl_EmotionFunctions.js    VERSION Beta 1.2.0
 //=============================================================================
 
 var Imported = Imported || {};
@@ -56,65 +56,80 @@ Stahl.EmotionFunctions = Stahl.EmotionFunctions || {};
  * emotionTier(): number
  * returns the battler's emotion tier of any type
  * 
- * setStateTier(type, tier): void
+ * setStateTier(type, tier, parseText): void
  * set states that uses tiering system, removes the other tiers
  * Parameter:
  * type: String - "happy", "sad", "angry", "afraid", "atk", "def", "spd"
  * tier: number - the tier of state
+ * parseText: boolean - whether to show text after adding state
  * 
- * addStateTier(type, tier, showText): void
+ * addStateTier(type, tier, parseText): void
  * adds states that uses tiering system
  * Parameter:
  * type: String - "happy", "sad", "angry", "afraid", "atk", "def", "spd"
  * tier: number - amount of tier added
- * showText: boolean - whether to show parse text after adding state
+ * parseText: boolean - whether to show text after adding state
  * 
- * addRandomEmotion(tier): void
- * adds random emotion to battler (doesn't include afraid)
+ * addRandomMainEmotion(tier, parseText): void
+ * adds random main emotion to battler (sad, happy, angry)
  * Parameter:
  * tier: number - amount of tier added
+ * parseText: boolean - whether to show text after adding state
  * 
- * addRandomBuff(tier): void
+ * addRandomEmotion(tier, parseText): void
+ * adds random emotion to battler (ANY emotion possile)
+ * Parameter:
+ * tier: number - amount of tier added
+ * parseText: boolean - whether to show text after adding state
+ * 
+ * addRandomBuff(tier, parseText): void
  * adds random buff to battler 
  * Parameter:
  * tier: number - amount of tier added
+ * parseText: boolean - whether to show text after adding state
  * 
- * addSupplementaryEmotion(tier): void
+ * addSupplementaryEmotion(tier, parseText): void
  * adds emotion of the battler's current emotion
  * Parameter:
  * tier: number - amount of tier added
+ * parseText: boolean - whether to show text after adding state
  * 
- * addSupplementaryBuff(tier): void
+ * addSupplementaryBuff(tier, parseText): void
  * adds buff based on battler's current emotion strength
  * Parameter:
  * tier: number - amount of tier added
+ * parseText: boolean - whether to show text after adding state
  * 
- * addComplimentaryBuff(tier): void
+ * addComplimentaryBuff(tier, parseText): void
  * adds buff based on battler's current emotion weakness
  * Parameter:
  * tier: number - amount of tier added
+ * parseText: boolean - whether to show text after adding state
  * 
- * addAdvantageEmotion(target, tier): void
+ * addAdvantageEmotion(target, tier, parseText): void
  * adds buff to battler that is advantageous to the target
  * Parameter:
  * target: Game_Battler - target's emotion to be based on
  * tier: number - amount of tier added
  * 
- * addDisavantageEmotion(target, tier): void
+ * addDisavantageEmotion(target, tier, parseText): void
  * adds buff to battler that is disadvantageous to the target
  * Parameter:
  * target: Game_Battler - target's emotion to be based on
  * tier: number - amount of tier added
+ * parseText: boolean - whether to show text after adding state
  * 
- * addHighestBuff(tier): void
+ * addHighestBuff(tier, parseText): void
  * adds tier to the buff type with highest tier the battler has
  * Parameter:
  * tier: number - amount of tier added
+ * parseText: boolean - whether to show text after adding state
  * 
- * addLowestBuff(tier): void
+ * addLowestBuff(tier, parseText): void
  * adds tier to the buff type with lowest tier the battler has
  * Parameter:
  * tier: number - amount of tier added
+ * parseText: boolean - whether to show text after adding state
  * 
  * parseBuffText(type, tier): void
  * adds text about added buffs to the battle log, similar to CBAT state addition text
@@ -144,8 +159,56 @@ function randomIntRange(min, max) {
 	return Math.floor(Math.random()*(max-min+1)+min);
 };
 
-const emotionList = ["sad","angry","happy","afraid"];
-const buffList = ["atk","def","spd"];
+const stateTypeDict = {
+	emotions: {
+		"sad": {
+			idList: [0,10,11,12],
+			strong: ["happy"],
+			weak: ["angry"],
+			limitText: `tname + " can't get any SADDER!"`,
+			supBuff: ["def"],
+			comBuff: ["spd"],
+		},
+		"angry": {
+			idList: [0,14,15,16],
+			strong: ["sad"],
+			weak: ["happy"],
+			limitText: `tname + " can't get any ANGRIER!"`,
+			supBuff: ["atk"],
+			comBuff: ["def"],
+		},
+		"happy": {
+			idList: [0,6,7,8],
+			strong: ["angry"],
+			weak: ["sad"],
+			limitText: `tname + " can't get any HAPPIER!"`,
+			supBuff: ["spd"],
+			comBuff: ["atk"],
+		},
+		"afraid": {
+			idList: [0,18],
+			weak: ["angry", "happy", "sad"],
+			limitText: `tname + " can't be more AFRAID!"`,
+		},
+	},
+	buffs: {
+		"atk": {
+			idList: [94,93,92,0,89,90,91],
+			statText: "ATTACK",
+			altName: ["attack"],
+		},
+		"def": {
+			idList: [100,99,98,0,95,96,97],
+			statText: "DEFENSE",
+			altName: ["defense"],
+		},
+		"spd": {
+			idList: [106,105,104,0,101,102,103],
+			statText: "SPEED",
+			altName: ["speed","agi","agility"],
+		},
+	},
+};
 
 //state ID to text display
 const emotionTextDict = {
@@ -161,13 +224,6 @@ const emotionTextDict = {
 	18: 'AFRAID!',
 };
 
-//emotion type to max text display
-const emotionMaxTextDict = {
-	"happy": "HAPPIER!",
-	"sad": "SADDER!",
-	"angry": "ANGRIER!"
-};
-
 //buff tier to adjective for display
 const buffAdjectiveDict = {
 	1: '',
@@ -178,91 +234,89 @@ const buffAdjectiveDict = {
 	6: 'exceedingly!',
 };
 
-//Emotion Advantage of key
-const emotionAdvantageDict = {
-	"sad": "happy",
-	"angry": "sad",
-	"happy": "angry",
-};
-
-const stateDict = {
-	"sad": [0,10,11,12],
-	"angry": [0,14,15,16],
-	"happy": [0,6,7,8],
-	"afraid": [0,18],
-	"atk": [94,93,92,0,89,90,91],
-	"def": [100,99,98,0,95,96,97],
-	"spd": [106,105,104,0,101,102,103]
-};
-
-const stateAltNameDict = {
-	"attack": "atk",
-	"defense": "def",
-	"speed": "spd",
-	"agi": "spd",
-	"agility": "spd"
-};
-
-const buffStateTextDict = {
-	"atk": "ATTACK",
-	"def": "DEFENSE",
-	"spd": "SPEED"
-};
-
-//array of State IDs from low to high. 0 is No state.
+//convert Alternate name into used names, mostly buffs
 function convertAltStateName(input){
-	let _input = input.toLowerCase();
+	input = input.toLowerCase();
 
-	//turn alt name into used name
-	for (let key in stateAltNameDict) {
-		const _key = String(key);
-		if (_key == _input)
-			return stateAltNameDict[_key];
+	let buffDict = stateTypeDict.buffs;
+	for (let key in buffDict) {
+		key = String(key);
+		if (buffDict[key].altName.includes(input))
+			return key;
 	}
-	return _input;
+	return input;
 }
 
 //array of State IDs from low to high. 0 is No state.
 function getStateIDArray(type){
-	let _type = convertAltStateName(type.toLowerCase());
+	type = convertAltStateName(type);
 
-	//return state array
-	for (let key in stateDict) {
-		const _key = String(key);
-		if (_key == _type)
-			return stateDict[_key];
+	//return id List of emotions
+	for (let key in stateTypeDict.emotions) {
+		key = String(key);
+		if (key == type)
+			return stateTypeDict.emotions[key].idList;
+	}
+
+	//return id List of buffs
+	for (let key in stateTypeDict.buffs) {
+		key = String(key);
+		if (key == type)
+			return stateTypeDict.buffs[key].idList;
 	}
 
 	console.log("no state found");
-	return "none";
+	return [0];
 };
 
-//Returns Emotion Advantage to input
-function findEmotionAdvantage(type){
-	for (let key in emotionAdvantageDict) {
-		key = String(key);
+//Returns Emotion Advantage to input, returns an array of all possible
+function getEmotionAdvantage(type){
+	type = convertAltStateName(type);
+	let emoDict = stateTypeDict.emotions;
+	for (let key in emoDict) {
 		if (key == type)
-			return emotionAdvantageDict[key];
+			return emoDict[key].strong;
 	}
-	return "none";
+	return [];
 };
 
 //Returns Emotion Disadvantage to input, reverse of advantage
-function findEmotionDisadvantage(type){
-	for (let key in emotionAdvantageDict) {
-		key = String(key);
-		if (emotionAdvantageDict[key] == type)
-			return key;
+function getEmotionDisadvantage(type){
+	type = convertAltStateName(type);
+	let emoDict = stateTypeDict.emotions;
+	for (let key in emoDict) {
+		if (key == type)
+			return emoDict[key].weak;
 	}
-	return "none";
+	return [];
+};
+
+function getComBuff(type){
+	type = convertAltStateName(type);
+	let emoDict = stateTypeDict.emotions;
+	for (let key in emoDict) {
+		if (key == type)
+			return emoDict[key].comBuff;
+	}
+	return [];
+};
+
+function getSupBuff(type){
+	type = convertAltStateName(type);
+	let emoDict = stateTypeDict.emotions;
+	for (let key in emoDict) {
+		if (key == type)
+			return emoDict[key].supBuff;
+	}
+	return [];
 };
 
 function isEmotionState(type){
-	return emotionList.includes(convertAltStateName(type.toLowerCase()));
+	return Object.keys(stateTypeDict.emotions).includes(convertAltStateName(type));
 };
 
 function isBuffState(type){
-	return buffList.includes(convertAltStateName(type.toLowerCase()));
+	return Object.keys(stateTypeDict.buffs).includes(convertAltStateName(type));
 };
 
 
@@ -272,7 +326,8 @@ function isBuffState(type){
 
 //returns the emotion type affected
 Game_Battler.prototype.emotionStateType = function() {
-	for (const a of ["happy", "sad", "angry", "afraid"]) {
+	let emoArr = Object.keys(stateTypeDict.emotions);
+	for (const a of emoArr) {
 		if (getStateIDArray(a).some(this.isStateAffected.bind(this)))
 			return a;
 	}
@@ -387,77 +442,80 @@ Game_Battler.prototype.addStateTier = function(type, tier = 1, parseText = false
 };
 
 //Adds random emotion
-Game_Battler.prototype.addRandomEmotion = function(tier = 1) {
-	const type = ["happy", "sad", "angry"][Math.randomInt(3)];
-	this.addStateTier(type, tier);
+Game_Battler.prototype.addRandomMainEmotion = function(tier = 1, parseText = false) {
+	let arr = ["happy", "sad", "angry"];
+	let type = arr[Math.randomInt(arr.length)];
+	this.addStateTier(type, tier, parseText);
+};
+
+//Adds random emotion
+Game_Battler.prototype.addRandomEmotion = function(tier = 1, parseText = false) {
+	let arr = Object.keys(stateTypeDict.emotions);
+	let type = arr[Math.randomInt(arr.length)];
+	this.addStateTier(type, tier, parseText);
 };
 
 //Adds random buffs
-Game_Battler.prototype.addRandomBuff = function(tier = 1) {
-	const type = ["atk", "def", "spd"][Math.randomInt(3)];
-	this.addStateTier(type, tier);
+Game_Battler.prototype.addRandomBuff = function(tier = 1, parseText = false) {
+	let arr = Object.keys(stateTypeDict.buffs);
+	let type = arr[Math.randomInt(arr.length)];
+	this.addStateTier(type, tier, parseText);
 };
 
 //Adds random tier of the type. Specifying min and max
-Game_Battler.prototype.addRandomTier = function(type, minTier = 1, maxTier = 1) {
+Game_Battler.prototype.addRandomTier = function(type, minTier = 1, maxTier = 1, parseText = false) {
 	var tier = randomIntRange(minTier, maxTier);
-	this.addStateTier(type, tier);
+	this.addStateTier(type, tier, parseText);
 };
 
 //Adds emotion on current emotion
-Game_Battler.prototype.addSupplementaryEmotion = function(tier = 1) {
+Game_Battler.prototype.addSupplementaryEmotion = function(tier = 1, parseText = false) {
 	const curEmotion = this.emotionStateType();
-	this.addStateTier(curEmotion, tier);
+	this.addStateTier(curEmotion, tier, parseText);
 };
 
-//Adds buff on current emotion strength
-Game_Battler.prototype.addSupplementaryBuff = function(tier = 1) {
+//Adds buff on current emotion's strength
+Game_Battler.prototype.addSupplementaryBuff = function(tier = 1, parseText = false) {
 	const curEmotion = this.emotionStateType();
-	var type = "";
-	switch (curEmotion) {
-		case "happy": type = "spd"; break;
-		case "sad": type = "def"; break;
-		case "angry": type = "atk"; break;
-		default: return;
-	}
-	this.addStateTier(type, tier);
+	let typeArr = getSupBuff(curEmotion); //To give advantage to target, grab disadvantage
+	if (typeArr == []){return;};
+	let type = typeArr[Math.randomInt(typeArr.length)]; //randomize from selection
+	this.addStateTier(type, tier, parseText);
 };
 
-//Adds buff on current emotion weakness
-Game_Battler.prototype.addComplimentaryBuff = function(tier = 1) {
+//Adds buff on current emotion's weakness
+Game_Battler.prototype.addComplimentaryBuff = function(tier = 1, parseText = false) {
 	const curEmotion = this.emotionStateType();
-	var type = "";
-	switch (curEmotion) {
-		case "happy": type = "atk"; break;
-		case "sad": type = "spd"; break;
-		case "angry": type = "def"; break;
-		default: return;
-	}
-	this.addStateTier(type, tier);
+	let typeArr = getComBuff(curEmotion); //To give advantage to target, grab disadvantage
+	if (typeArr == []){return;};
+	let type = typeArr[Math.randomInt(typeArr.length)]; //randomize from selection
+	this.addStateTier(type, tier, parseText);
 };
 
 //Add emotion to the battler advantageous to "target". (Find target disadvantage. Target is sad then give happy, etc.)
-Game_Battler.prototype.addAdvantageEmotion = function(target, tier = 1) {
-	const targetEmotion = target.emotionStateType();
-	if (findEmotionAdvantage(targetEmotion) == "none")
-		return;
-	this.addStateTier(findEmotionDisadvantage(targetEmotion), tier)
+Game_Battler.prototype.addAdvantageEmotion = function(target, tier = 1, parseText = false) {
+	const targetEmoType = target.emotionStateType();
+	let typeArr = getEmotionDisadvantage(targetEmoType); //To give advantage to target, grab disadvantage
+	if (typeArr == []){return;};
+	let type = typeArr[Math.randomInt(typeArr.length)]; //randomize from selection
+	this.addStateTier(type, tier, parseText);
 };
 
 //Add emotion to the battler disadvantageous to "target". (Find target advantage. Target is sad then give angry, etc.)
-Game_Battler.prototype.addDisadvantageEmotion = function(target, tier = 1) {
-	const targetEmotion = target.emotionStateType();
-	if (findEmotionAdvantage(targetEmotion) == "none")
-		return;
-	this.addStateTier(findEmotionAdvantage(targetEmotion), tier)
+Game_Battler.prototype.addDisadvantageEmotion = function(target, tier = 1, parseText = false) {
+	const targetEmoType = target.emotionStateType();
+	let typeArr = getEmotionAdvantage(targetEmoType); //To give disadvantage to target, grab advantage
+	if (typeArr == []){return;};
+	let type = typeArr[Math.randomInt(typeArr.length)]; //randomize from selection
+	this.addStateTier(type, tier, parseText);
 };
 
 //Adds buff type that is highest
-Game_Battler.prototype.addHighestBuff = function(tier = 1) {
-	var type = "";
+Game_Battler.prototype.addHighestBuff = function(tier = 1, parseText = false) {
 	var typeSelection = [];
-	var highest = -1000; //ooga booga method, doubt there's ever going to be tier that extreme
+	var highest = -10000; //ooga booga method, doubt there's ever going to be tier that extreme
 
+	let buffList = Object.keys(stateTypeDict.buffs);
 	for (const a in buffList) {
 		const tierCheck = this.stateTypeTier(a);
 		if (tierCheck > highest) {
@@ -471,16 +529,16 @@ Game_Battler.prototype.addHighestBuff = function(tier = 1) {
 	if (typeSelection.length <= 0)
 		return; //if somehow nothing then return
 
-	type = typeSelection[Math.randomInt(typeSelection.length)] //select random type from possible selection
-	this.addStateTier(type, tier);
+	var type = typeSelection[Math.randomInt(typeSelection.length)] //select random type from possible selection
+	this.addStateTier(type, tier, parseText);
 };
 
 //Adds buff type that is lowest
-Game_Battler.prototype.addLowestBuff = function(tier = 1) {
-	var type = "";
+Game_Battler.prototype.addLowestBuff = function(tier = 1, parseText = false) {
 	var typeSelection = [];
-	var lowest = 1000; //ooga booga method, doubt there's ever going to be tier that extreme
+	var lowest = 10000; //ooga booga method, doubt there's ever going to be tier that extreme
 
+	let buffList = Object.keys(stateTypeDict.buffs);
 	for (const a in buffList) {
 		const tierCheck = this.stateTypeTier(a);
 		if (tierCheck < lowest) {
@@ -494,8 +552,8 @@ Game_Battler.prototype.addLowestBuff = function(tier = 1) {
 	if (typeSelection.length <= 0)
 		return; //if somehow nothing then return
 
-	type = typeSelection[Math.randomInt(typeSelection.length)] //select random type from possible selection
-	this.addStateTier(type, tier);
+	var type = typeSelection[Math.randomInt(typeSelection.length)] //select random type from possible selection
+	this.addStateTier(type, tier, parseText);
 };
 
 //Does the text for buff change on battle log, enter what to display manually
@@ -511,10 +569,11 @@ Game_Battler.prototype.parseBuffText = function(type, tier = 1) {
 	let adj = "";
 
 	//Get emotion max text
-	for (let key in buffStateTextDict) {
+	let buffDict = stateTypeDict.buffs;
+	for (let key in buffDict) {
 		key = String(key);
 		if (type = key) {
-			stat = buffStateTextDict[key];
+			stat = buffDict[key].statText;
 			break;
 		}
 	}
@@ -573,21 +632,22 @@ Game_Battler.prototype.parseEmotionText = function(type) {
 		first = `${tname} feels `;
 		second = `${adj}`; 
 	} else {
-		//Get emotion max text
-		for (let key in emotionMaxTextDict) {
-			key = String(key);
-			if (type = key) {
-				adj = emotionMaxTextDict[key];
-				break;
-			}
+		let sentence = "";
+		let emoDict = stateTypeDict.emotions;
+		for (let key in emoDict) {
+			if (key == type)
+				sentence = emoDict[key].limitText;
 		}
 
-		first = `${tname} can't get any `;
-		second = `${adj}`; 
-
-		if(type == "afraid") {
-			first = `${tname} can't be more `;
-			second = `AFRAID!`; 
+		first = eval(sentence);
+		second = "";
+		while (first.length > 40) {
+			const lastIndexOfSpace = first.lastIndexOf(' ');
+			if (lastIndexOfSpace === -1) {
+			  break;
+			}
+			second = first.substring(lastIndexOfSpace) + second;
+			first = first.substring(0, lastIndexOfSpace);
 		}
 	}
 
@@ -600,56 +660,3 @@ Game_Battler.prototype.parseEmotionText = function(type) {
 		BattleManager.addText(second, 16)
 	}
 };
-
-{
-	window.DGT = window.DGT || {}
-	DGT.reverieFixes = {}
-  
-	let alias = (originalStorage, baseClass, funcName, usePrototype, newFunc) => {
-	  	if (originalStorage[baseClass] == undefined) {
-			originalStorage[baseClass] = {}
-	  	}
-	  	// note: using window here is supposedly slightly stupid and i should polyfill globalthis or something
-	  	// but im not going to
-	  	if (usePrototype) { // prototype solution is stupid
-			originalStorage[baseClass][funcName] = window[baseClass].prototype[funcName] || (() => {}) // save original function
-			window[baseClass].prototype[funcName] = function(...args) {
-			  return newFunc.call(this, originalStorage[baseClass][funcName], ...args)
-			} // override function and pass original forward
-	  	} else {
-			originalStorage[baseClass][funcName] = window[baseClass][funcName] || (() => {}) // save original function
-			window[baseClass][funcName] = newFunc.bind(window[baseClass], originalStorage[baseClass][funcName]) // override function and pass original forward
-	  	}
-	}
-	alias = alias.bind(null, DGT.reverieFixes)
-	
-	AIManager.conditionEvalWithTarget = function() {
-	  	var action = this.action();
-	  	var item = action.item();
-	  	var user = this.battler();
-	  	var s = $gameSwitches._data;
-	  	var v = $gameVariables._data;
-		
-	  	var group = this.getActionGroup();
-	  	var validTargets = [];
-	  	for (var i = 0; i < group.length; ++i) {
-			var target = group[i];
-			if (!target) continue;
-			try {
-			  if (eval(condition)) validTargets.push(target);
-			} catch (e) {
-			  Yanfly.Util.displayError(e, condition, 'A.I. EVAL WITH TARGETS ERROR')
-			}
-	  	}
-	  	if (validTargets.length <= 0) return false;
-	  	this.setProperTarget(validTargets);
-	  	return true;
-	}
-	alias('AIManager', 'passAIConditions', false, function(original, line) {
-	  	if (line.match(/TARGEVAL[ ](.*)/i)) {
-			var condition = String(RegExp.$1);
-			return this.conditionEvalWithTarget(condition);
-	  	}
-	  	return original.call(this, line)
-	})
-}
